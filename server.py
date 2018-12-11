@@ -5,6 +5,7 @@ import hashlib
 import random
 import time
 from peewee import *
+import stomp
 
 def print_func_name(func):
     def wrapper(*func_args, **func_argv):
@@ -68,6 +69,7 @@ class Server:
             'list-friend':self.listFrnd,
             'post':self.post,
             'receive-post':self.recvPost,
+            'send':self.sendMsg
         }
         db.connect()
         db.create_tables([User, FriendPair ,FriendInvite, Post, Group, GroupMember])
@@ -114,9 +116,11 @@ class Server:
     def createRandomToken():
         return hashlib.sha256(str(random.random()).encode('UTF-8')).hexdigest()
 
-    @staticmethod
-    def checkToken(token):
-        user = User.select().where(User.token == token)
+    def checkToken(self):
+        try:
+            user = User.select().where(User.token == self.cmd_frag[1])
+        except:
+            return None
         if not user:
             print('XXX: Not login yet')
             return None
@@ -192,13 +196,8 @@ class Server:
 
     @print_func_name
     def delete(self):
-        try:
-            token = self.cmd_frag[1]
-        except:
-            token = ''
-
         # Check user
-        user = self.checkToken(token)
+        user = self.checkToken()
         if not user:
             return self.createResp(1, message = 'Not login yet')
 
@@ -214,13 +213,8 @@ class Server:
     
     @print_func_name
     def logout(self):
-        try:
-            token = self.cmd_frag[1]
-        except:
-            token = ''
-
         # Check user
-        user = self.checkToken(token)
+        user = self.checkToken()
         if not user:
             return self.createResp(1, message = 'Not login yet')
         
@@ -238,13 +232,8 @@ class Server:
 
     @print_func_name
     def invite(self):
-        try:
-            sender_token = self.cmd_frag[1]
-        except:
-            sender_token = ''
-            
-        # Check sender token
-        sender = self.checkToken(sender_token)
+        # Check sender
+        sender = self.checkToken()  
         if not sender:
             print('XXX: Not login yet')
             return self.createResp(1, message = 'Not login yet')
@@ -305,11 +294,7 @@ class Server:
     @print_func_name
     def listInvt(self):
         # Check user
-        try:
-            user = self.checkToken(self.cmd_frag[1])
-        except:
-            user = None
-
+        user = self.checkToken()
         if not user:
             print('XXX: Not login yet')
             return self.createResp(1, message = 'Not login yet')
@@ -326,13 +311,8 @@ class Server:
     
     @print_func_name
     def acptInvt(self):
-        try:
-            token = self.cmd_frag[1]
-        except:
-            token = ''
-
-        # Check User
-        user = self.checkToken(token)    
+        # Check user
+        user = self.checkToken()
         if not user:
             print('XXX: Not login yet')
             return self.createResp(1, message = 'Not login yet')
@@ -379,11 +359,8 @@ class Server:
         
     @print_func_name
     def listFrnd(self):
-        # Check token
-        try:
-            user = self.checkToken(self.cmd_frag[1])
-        except:
-            user = None
+        # Check user
+        user = self.checkToken()
         if not user:
             print('XXX: Not login yet')
             return self.createResp(1, message = 'Not login yet')
@@ -401,11 +378,8 @@ class Server:
     
     @print_func_name
     def post(self):
-        # Check token
-        try:
-            user = self.checkToken(self.cmd_frag[1])  
-        except:
-            user = None
+        # Check user
+        user = self.checkToken()
         if not user:
             print('XXX: Not login yet')
             return self.createResp(1, message = 'Not login yet')
@@ -422,11 +396,8 @@ class Server:
     
     @print_func_name
     def recvPost(self):
-        # Check token
-        try:
-            user = self.checkToken(self.cmd_frag[1])
-        except:
-            user = None
+        # Check user
+        user = self.checkToken()
         if not user:
             print('XXX: Not login yet')
             return self.createResp(1, message = 'Not login yet')
@@ -452,11 +423,59 @@ class Server:
         return self.createResp(0, post = posts)
 
     ########## HW4 ##########
+
+    @staticmethod
+    def sendAMQ(dest, msg):
+        conn = stomp.Connection()
+        conn.connect()
+        conn.send(dest, msg)
+        conn.disconnect()
+
     @print_func_name
     def sendMsg(self):
+        # Check user
+        user = self.checkToken()
+        if not user:
+            print('XXX: Not login yet')
+            return self.createResp(1, message = 'Not login yet')
         
-        pass
-    
+        # Usage error
+        if len(self.cmd_frag) != 4:
+            print('XXX: Usage error')
+            return self.createResp(1, message = 'Usage: send <user> <friend> <message>')
+        
+        # Receiver exists?
+        recver = User.select().where(User.username == self.cmd_frag[2])
+        if not recver:
+            print('XXX: No such recver')
+            return self.createResp(1, message = 'No such user exist')
+        recver = recver[0]
+
+        # Is user's friend?
+        if user.id < recver.id:
+            fp = FriendPair.select().where(
+                (FriendPair.friend_1 == user) &
+                (FriendPair.friend_2 == recver))
+        else:
+            fp = FriendPair.select().where(
+                (FriendPair.friend_1 == recver) &
+                (FriendPair.friend_2 == user))
+        if not fp:
+            print('XXX: Is not friend')
+            return self.createResp(1, message = self.cmd_frag[2] + ' is not your friend')
+        
+        # Receiver offline
+        if not recver.token:
+            print('XXX: Recver offline')
+            return self.createResp(1, message = self.cmd_frag[2] + ' is not online')
+        
+        # Send message
+        self.sendAMQ(
+            '/queue/'+recver.token, 
+            '<<<{0}->{1}: {2}>>>'.format(user.username, self.cmd_frag[2], self.cmd_frag[3]))
+        return self.createResp(1, message = 'Success!')
+        
+
     @print_func_name
     def crtGrp(self):
         pass

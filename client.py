@@ -2,9 +2,19 @@ import sys
 import socket
 import json
 import os
+#from stomp import *
 import stomp
+class Listener():
+    def on_message(self, headers, msg):
+        print(msg)
 
-class Listener
+class UserInfo():
+    def __init__(self, name, token, sub_id):
+        self.name = name
+        self.token = token
+        self.user_sub = sub_id
+        self.group_sub = {}
+
 
 class Client(object):
     def __init__(self, ip, port):
@@ -15,10 +25,17 @@ class Client(object):
                 self.port = int(port)
             else:
                 raise Exception('Port value should between 1~65535')
-            self.cookie = {}
+            
         except Exception as e:
             print(e, file=sys.stderr)
             sys.exit(1)
+
+        self.cmd_user = ''
+        self.users = {}
+        self.sub_num = 0
+        self.amq = stomp.Connection([(self.ip, 61613)])
+        self.amq.set_listener('', Listener())
+        self.amq.connect()
 
     def run(self):
         while True:
@@ -63,22 +80,41 @@ class Client(object):
 
         if cmd:
             command = cmd.split()
-            if resp['status'] == 0 and command[0] == 'login':
-                self.cookie[command[1]] = resp['token']
+            if resp['status'] == 0 :
+                if  command[0] == 'login':
+                    self.users[command[1]] = UserInfo(command[1], resp['token'], self.sub_num)
+                    self.__amq_subscribe('/queue/'+resp['token'])
+
+                elif command[0] == 'logout' or command[0] == 'delete':
+                    self.__amq_user_unsub(self.users[self.cmd_user])
+                    self.users.pop(self.cmd_user)
 
     def __attach_token(self, cmd=None):
         if cmd:
             command = cmd.split()
             if len(command) > 1:
                 if command[0] != 'register' and command[0] != 'login':
-                    if command[1] in self.cookie:
-                        command[1] = self.cookie[command[1]]
+                    if command[1] in self.users:
+                        self.cmd_user = command[1]
+                        command[1] = self.users[command[1]].token
                     else:
                         command.pop(1)
             return ' '.join(command)
         else:
             return cmd
 
+    def __amq_subscribe(self, channel):
+        #self.amq.connect()
+        self.amq.subscribe(channel, self.sub_num)
+        self.sub_num += 1
+        #self.amq.disconnect()
+
+    def __amq_user_unsub(self, userinfo):
+        #self.amq.connect()
+        self.amq.unsubscribe(userinfo.user_sub)
+        for k, ele in userinfo.group_sub:
+            self.amq.unsubscribe(ele)
+        #self.amq.disconnect()
 
 def launch_client(ip, port):
     c = Client(ip, port)
