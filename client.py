@@ -83,7 +83,7 @@ class Client(object):
             if resp['status'] == 0 :
                 if  command[0] == 'login':
                     self.users[command[1]] = UserInfo(command[1], resp['token'])
-                    self.__amq_subscribe('/queue/'+resp['token'])
+                    self.__amq_subscribe('/queue/' + command[1])
 
                 elif command[0] == 'logout' or command[0] == 'delete':
                     self.__amq_user_unsub(self.users[self.cmd_user])
@@ -110,7 +110,7 @@ class Client(object):
 
     def __amq_user_unsub(self, userinfo):
         #self.amq.connect()
-        self.amq.unsubscribe(userinfo.token)
+        self.amq.unsubscribe(userinfo.username)
         for k, ele in userinfo.group_sub:
             self.amq.unsubscribe(ele)
         #self.amq.disconnect()

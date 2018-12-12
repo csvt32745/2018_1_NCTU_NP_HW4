@@ -471,7 +471,7 @@ class Server:
         
         # Send message
         self.sendAMQ(
-            '/queue/'+recver.token, 
+            '/queue/'+recver.username, 
             '<<<{0}->{1}: {2}>>>'.format(user.username, self.cmd_frag[2], ' '.join(self.cmd_frag[2:])))
         return self.createResp(1, message = 'Success!')
         
