@@ -203,11 +203,10 @@ class Server:
 
         group_info = []
         groups = GroupMember.select().where(GroupMember.user == user)
-        for g in groups:
-            group_info.append({                 
-                'groupname': g.group.groupname,
-                'channel': g.group.channel
-            })
+        group_info = list(map(
+            lambda x: {'groupname': x.group.groupname, 'channel': x.group.channel},
+            groups
+        ))
 
         print('OOO: token = ' + user.token)
         return self.createResp(
@@ -547,9 +546,7 @@ class Server:
         
         # Send group list
         groups = Group.select()
-        group = []
-        for g in groups:
-            group.append(g.groupname)
+        group = list(map(lambda x: x.groupname, groups))
 
         print('OOO: {0} groups'.format(len(groups)))
         return self.createResp(0, group = group)
