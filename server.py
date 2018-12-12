@@ -50,7 +50,7 @@ class Group(BaseModel):
 
 class GroupMember(BaseModel):
     group = ForeignKeyField(Group, related_name = 'members')
-    user = ForeignKeyField(User, related_name = 'group')
+    user = ForeignKeyField(User, related_name = 'groups')
 
 class Server:
     def __init__(self, _host, _port):
@@ -115,7 +115,8 @@ class Server:
         if self.cmd_frag[0] == 'list-invite' and not status:
             # Cause invite could be a null list
             resp['invite'] = invite
-        if self.cmd_frag[0] == 'list-group' and not status:
+        if (self.cmd_frag[0] == 'list-group' or self.cmd_frag[0] == 'list-joined')\
+        and not status:
             resp['group'] = group
         if group_info:
             resp['group_info'] = group_info
@@ -201,11 +202,9 @@ class Server:
         
         # Send AMQ group channel
 
-        group_info = []
-        groups = GroupMember.select().where(GroupMember.user == user)
         group_info = list(map(
             lambda x: {'groupname': x.group.groupname, 'channel': x.group.channel},
-            groups
+            user.groups
         ))
 
         print('OOO: token = ' + user.token)
@@ -548,13 +547,28 @@ class Server:
         groups = Group.select()
         group = list(map(lambda x: x.groupname, groups))
 
-        print('OOO: {0} groups'.format(len(groups)))
+        print('OOO: {0} groups'.format(len(group)))
         return self.createResp(0, group = group)
     
-    
+
     @print_func_name
     def listJoined(self):
-        pass
+        # Check user
+        user = self.checkToken()
+        if not user:
+            print('XXX: Not login yet')
+            return self.createResp(1, message = 'Not login yet')
+
+        # Usage error
+        if len(self.cmd_frag) != 2:
+            print('XXX: Usage error')
+            return self.createResp(1, message = 'Usage: list-joined <user>')
+        
+        # Send joined group list
+        group = list(map(lambda x: x.group.groupname, user.groups))
+
+        print('OOO: {0} joined groups'.format(len(group)))
+        return self.createResp(0, group = group)
     
     @print_func_name
     def joinGrp(self):

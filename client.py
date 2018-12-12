@@ -98,7 +98,7 @@ class Client(object):
                 
                 if 'group_info' in resp:
                     for g in resp['group_info']:
-                        self.users[self.cmd_user].group_sub[g['groupname']] = g['channel']
+                        self.users[self.cmd_user].group_sub[g['groupname']] = '/topic/' + g['channel']
                         self.__amq_subscribe('/topic/' + g['channel'])
                         
 
@@ -124,7 +124,7 @@ class Client(object):
     def __amq_user_unsub(self, userinfo):
         #self.amq.connect()
         self.amq.unsubscribe(userinfo.username)
-        for ele in userinfo.group_sub:
+        for ele in userinfo.group_sub.values():
             self.amq.unsubscribe(ele)
         #self.amq.disconnect()
 
