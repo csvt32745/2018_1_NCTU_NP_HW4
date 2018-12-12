@@ -572,7 +572,40 @@ class Server:
     
     @print_func_name
     def joinGrp(self):
-        pass
+        # Check user
+        user = self.checkToken()
+        if not user:
+            print('XXX: Not login yet')
+            return self.createResp(1, message = 'Not login yet')
+
+        # Usage error
+        if len(self.cmd_frag) != 3:
+            print('XXX: Usage error')
+            return self.createResp(1, message = 'Usage: join-group <user> <group>')
+        
+        # Group doesnt exist
+        group_name = self.cmd_frag[2]
+        group = Group.select().where(Group.groupname == group_name)
+        if not group:
+            print('XXX: Group doesnt exist')
+            return self.createResp(1, message = group_name + ' dost not exist')
+        group = group[0]
+        
+        # Already joined
+        gpair = GroupMember.select().where(
+            (GroupMember.group == group) & (GroupMember.user == user))
+        if gpair:
+            print('XXX: Already joined')
+            return self.createResp(1, message = 'Already a member of ' + group_name)
+        
+        # Create GroupMember
+        GroupMember.create(group = group, user = user)
+        group_info = [{
+            'groupname': group.groupname,
+            'channel': group.channel
+        }]
+        print('OOO')
+        return self.createResp(0, message = 'Success!', group_info = group_info)
     
     @print_func_name
     def sendGrp(self):

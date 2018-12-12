@@ -90,7 +90,7 @@ class Client(object):
             if resp['status'] == 0 :
                 if  command[0] == 'login':
                     self.users[self.cmd_user] = UserInfo(self.cmd_user, resp['token'])
-                    self.__amq_subscribe(self.cmd_user)
+                    self.__amq_subscribe(self.cmd_user, self.cmd_user)
 
                 elif command[0] == 'logout' or command[0] == 'delete':
                     self.__amq_user_unsub(self.users[self.cmd_user])
@@ -99,7 +99,7 @@ class Client(object):
                 if 'group_info' in resp:
                     for g in resp['group_info']:
                         self.users[self.cmd_user].group_sub[g['groupname']] = '/topic/' + g['channel']
-                        self.__amq_subscribe('/topic/' + g['channel'])
+                        self.__amq_subscribe(self.cmd_user, '/topic/' + g['channel'])
                         
 
     def __attach_token(self, cmd=None):
@@ -116,16 +116,16 @@ class Client(object):
         else:
             return cmd
 
-    def __amq_subscribe(self, channel):
+    def __amq_subscribe(self, username, channel):
         #self.amq.connect()
-        self.amq.subscribe(channel, channel)
+        self.amq.subscribe(channel, username + channel)
         #self.amq.disconnect()
 
     def __amq_user_unsub(self, userinfo):
         #self.amq.connect()
         self.amq.unsubscribe(userinfo.username)
         for ele in userinfo.group_sub.values():
-            self.amq.unsubscribe(ele)
+            self.amq.unsubscribe(userinfo.username + ele)
         #self.amq.disconnect()
 
 def launch_client(ip, port):
