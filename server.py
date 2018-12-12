@@ -609,9 +609,39 @@ class Server:
     
     @print_func_name
     def sendGrp(self):
-        pass
-    
+        # Check user
+        user = self.checkToken()
+        if not user:
+            print('XXX: Not login yet')
+            return self.createResp(1, message = 'Not login yet')
 
+        # Usage error
+        if len(self.cmd_frag) < 4:
+            print('XXX: Usage error')
+            return self.createResp(1, message = 'Usage: send-group <user> <group> <message>')
+        
+        # Group doesnt exist 
+        group_name = self.cmd_frag[2]
+        group = Group.select().where(Group.groupname == group_name)
+        if not group:
+            print('XXX: Group doesnt exist')
+            return self.createResp(1, message = 'No such group exist')
+        group = group[0]
+
+        # Is group member?
+        gpair = GroupMember.select().where(
+            (GroupMember.group == group) & (GroupMember.user == user))
+        if not gpair:
+            print('XXX: Is not member')
+            return self.createResp(1, message = 'You are not the member of ' + group_name)
+        
+        # Send message
+        self.sendAMQ(
+            '/topic/' + group_name,
+            '<<<{0}->GROUP<{1}>:{2}>>>'.format(user.username, group.groupname, ' '.join(self.cmd_frag[3:]))
+        )
+        print('OOO')
+        return self.createResp(0, message = 'Success!')
 
 # main
 if len(sys.argv) < 2 or len(sys.argv) > 3:
