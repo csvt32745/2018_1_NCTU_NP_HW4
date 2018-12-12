@@ -101,7 +101,8 @@ class Server:
     
     #@staticmethod
     def createResp(self, status, message = '', 
-    token = '', post = '', friend = '', invite = '', group_info = ''):
+    token = '', post = '', friend = '', invite = '', 
+    group_info = '', group = ''):
         resp = { 'status': status }
         if token:
             resp['token'] = token
@@ -114,6 +115,8 @@ class Server:
         if self.cmd_frag[0] == 'list-invite' and not status:
             # Cause invite could be a null list
             resp['invite'] = invite
+        if self.cmd_frag[0] == 'list-group' and not status:
+            resp['group'] = group
         if group_info:
             resp['group_info'] = group_info
 
@@ -531,7 +534,26 @@ class Server:
     
     @print_func_name
     def listGrp(self):
-        pass
+        # Check user
+        user = self.checkToken()
+        if not user:
+            print('XXX: Not login yet')
+            return self.createResp(1, message = 'Not login yet')
+
+        # Usage error
+        if len(self.cmd_frag) != 2:
+            print('XXX: Usage error')
+            return self.createResp(1, message = 'Usage: list-group <user>')
+        
+        # Send group list
+        groups = Group.select()
+        group = []
+        for g in groups:
+            group.append(g.groupname)
+
+        print('OOO: {0} groups'.format(len(groups)))
+        return self.createResp(0, group = group)
+    
     
     @print_func_name
     def listJoined(self):

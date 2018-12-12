@@ -78,7 +78,13 @@ class Client(object):
             else:
                 print('No posts')
 
-        
+        if 'group' in resp:
+            if len(resp['group']) > 0:
+                for g in resp['group'] :
+                    print(g)
+            else:
+                print('No groups')
+
         if cmd:
             command = cmd.split()
             if resp['status'] == 0 :
@@ -118,7 +124,7 @@ class Client(object):
     def __amq_user_unsub(self, userinfo):
         #self.amq.connect()
         self.amq.unsubscribe(userinfo.username)
-        for k, ele in userinfo.group_sub:
+        for ele in userinfo.group_sub:
             self.amq.unsubscribe(ele)
         #self.amq.disconnect()
 
