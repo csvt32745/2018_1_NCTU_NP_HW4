@@ -10,7 +10,7 @@ class Listener():
 
 class UserInfo():
     def __init__(self, name, token):
-        self.name = name
+        self.username = name
         self.token = token
         #self.user_sub = sub_id
         #sub_id = token
@@ -78,24 +78,31 @@ class Client(object):
             else:
                 print('No posts')
 
+        
         if cmd:
             command = cmd.split()
             if resp['status'] == 0 :
                 if  command[0] == 'login':
-                    self.users[command[1]] = UserInfo(command[1], resp['token'])
-                    self.__amq_subscribe('/queue/' + command[1])
+                    self.users[self.cmd_user] = UserInfo(self.cmd_user, resp['token'])
+                    self.__amq_subscribe(self.cmd_user)
 
                 elif command[0] == 'logout' or command[0] == 'delete':
                     self.__amq_user_unsub(self.users[self.cmd_user])
                     self.users.pop(self.cmd_user)
+                
+                if 'group_info' in resp:
+                    for g in resp['group_info']:
+                        self.users[self.cmd_user].group_sub[g['groupname']] = g['channel']
+                        self.__amq_subscribe('/topic/' + g['channel'])
+                        
 
     def __attach_token(self, cmd=None):
         if cmd:
             command = cmd.split()
             if len(command) > 1:
+                self.cmd_user = command[1]
                 if command[0] != 'register' and command[0] != 'login':
                     if command[1] in self.users:
-                        self.cmd_user = command[1]
                         command[1] = self.users[command[1]].token
                     else:
                         command.pop(1)

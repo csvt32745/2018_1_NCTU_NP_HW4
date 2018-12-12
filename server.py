@@ -59,17 +59,22 @@ class Server:
         self.cmd_str = ''
         self.cmd_frag = []
         self.cmd_switch = {
-            'register': self.register,
-            'login': self.login,
-            'delete': self.delete,
-            'logout': self.logout,
-            'invite': self.invite,
-            'list-invite':self.listInvt,
+            'register':     self.register,
+            'login':        self.login,
+            'delete':       self.delete,
+            'logout':       self.logout,
+            'invite':       self.invite,
+            'list-invite':  self.listInvt,
             'accept-invite':self.acptInvt,
-            'list-friend':self.listFrnd,
-            'post':self.post,
-            'receive-post':self.recvPost,
-            'send':self.sendMsg
+            'list-friend':  self.listFrnd,
+            'post':         self.post,
+            'receive-post': self.recvPost,
+            'send':         self.sendMsg,
+            'create-group': self.crtGrp,
+            'list-group':   self.listGrp,
+            'list-joined':  self.listJoined,
+            'join-group':   self.joinGrp,
+            'send-group':   self.sendGrp
         }
         db.connect()
         db.create_tables([User, FriendPair ,FriendInvite, Post, Group, GroupMember])
@@ -96,7 +101,7 @@ class Server:
     
     #@staticmethod
     def createResp(self, status, message = '', 
-    token = '', post = '', friend = '', invite = ''):
+    token = '', post = '', friend = '', invite = '', group_info = ''):
         resp = { 'status': status }
         if token:
             resp['token'] = token
@@ -109,6 +114,8 @@ class Server:
         if self.cmd_frag[0] == 'list-invite' and not status:
             # Cause invite could be a null list
             resp['invite'] = invite
+        if group_info:
+            resp['group_info'] = group_info
 
         return json.dumps(resp)
 
@@ -185,13 +192,25 @@ class Server:
             return self.createResp(1, message ='No such user or password error')
         
         # Create and send Token
-        if(not user.token):
+        if not user.token:
             user.token = self.createRandomToken()
             user.save()
+        
+        # Send AMQ group channel
+
+        group_info = []
+        groups = GroupMember.select().where(GroupMember.user == user)
+        for g in groups:
+            group_info.append({                 
+                'groupname': g.group.groupname,
+                'channel': g.group.channel
+            })
+
         print('OOO: token = ' + user.token)
         return self.createResp(
             0,
             token = user.token,
+            group_info = group_info,
             message = 'Success!')
 
     @print_func_name
@@ -473,12 +492,42 @@ class Server:
         self.sendAMQ(
             '/queue/'+recver.username, 
             '<<<{0}->{1}: {2}>>>'.format(user.username, self.cmd_frag[2], ' '.join(self.cmd_frag[2:])))
-        return self.createResp(1, message = 'Success!')
+        print('OOO')
+        return self.createResp(0, message = 'Success!')
         
 
     @print_func_name
     def crtGrp(self):
-        pass
+        # Check user
+        user = self.checkToken()
+        if not user:
+            print('XXX: Not login yet')
+            return self.createResp(1, message = 'Not login yet')
+
+        # Usage error
+        if len(self.cmd_frag) != 3:
+            print('XXX: Usage error')
+            return self.createResp(1, message = 'Usage: create-group <user> <group>')
+
+        # Same group name exist
+        group_name = self.cmd_frag[2]
+        if Group.select().where(Group.groupname == group_name):
+            print('XXX: Same name')
+            return self.createResp(1, message = group_name + ' already exist')
+        
+        # Create group
+        #cur_group = Group.create(groupname = group_name, channel = self.createRandomToken())
+        cur_group = Group.create(groupname = group_name, channel = group_name)
+        GroupMember.create(group = cur_group, user = user)
+        
+        group_info = [{
+            'groupname' : cur_group.groupname,
+            'channel' : cur_group.channel
+        }]
+        print('OOO')
+        return self.createResp(0, message = 'Success!', group_info = group_info)
+        
+        
     
     @print_func_name
     def listGrp(self):
