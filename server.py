@@ -440,7 +440,7 @@ class Server:
             return self.createResp(1, message = 'Not login yet')
         
         # Usage error
-        if len(self.cmd_frag) != 4:
+        if len(self.cmd_frag) < 4:
             print('XXX: Usage error')
             return self.createResp(1, message = 'Usage: send <user> <friend> <message>')
         
@@ -472,7 +472,7 @@ class Server:
         # Send message
         self.sendAMQ(
             '/queue/'+recver.token, 
-            '<<<{0}->{1}: {2}>>>'.format(user.username, self.cmd_frag[2], self.cmd_frag[3]))
+            '<<<{0}->{1}: {2}>>>'.format(user.username, self.cmd_frag[2], ' '.join(self.cmd_frag[2:])))
         return self.createResp(1, message = 'Success!')
         
 

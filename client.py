@@ -9,10 +9,11 @@ class Listener():
         print(msg)
 
 class UserInfo():
-    def __init__(self, name, token, sub_id):
+    def __init__(self, name, token):
         self.name = name
         self.token = token
-        self.user_sub = sub_id
+        #self.user_sub = sub_id
+        #sub_id = token
         self.group_sub = {}
 
 
@@ -32,7 +33,6 @@ class Client(object):
 
         self.cmd_user = ''
         self.users = {}
-        self.sub_num = 0
         self.amq = stomp.Connection([(self.ip, 61613)])
         self.amq.set_listener('', Listener())
         self.amq.connect()
@@ -82,7 +82,7 @@ class Client(object):
             command = cmd.split()
             if resp['status'] == 0 :
                 if  command[0] == 'login':
-                    self.users[command[1]] = UserInfo(command[1], resp['token'], self.sub_num)
+                    self.users[command[1]] = UserInfo(command[1], resp['token'])
                     self.__amq_subscribe('/queue/'+resp['token'])
 
                 elif command[0] == 'logout' or command[0] == 'delete':
@@ -105,13 +105,12 @@ class Client(object):
 
     def __amq_subscribe(self, channel):
         #self.amq.connect()
-        self.amq.subscribe(channel, self.sub_num)
-        self.sub_num += 1
+        self.amq.subscribe(channel, channel)
         #self.amq.disconnect()
 
     def __amq_user_unsub(self, userinfo):
         #self.amq.connect()
-        self.amq.unsubscribe(userinfo.user_sub)
+        self.amq.unsubscribe(userinfo.token)
         for k, ele in userinfo.group_sub:
             self.amq.unsubscribe(ele)
         #self.amq.disconnect()
